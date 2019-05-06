@@ -1,0 +1,62 @@
+#docker-compose deploy images in the order they are written
+#docker-compose will automaticlly put all images on same network
+#Temp,Rad,Aggregator must be **linked** to Flare sensor and point their env variables to it's address:port to run otherwise they won't run
+#Aggregator env var GC_ADDRESS must be pointed to gamecontroller var
+version : '3'
+services :
+  flare:
+     build: ./mars-challenge/sensorsuite/flare
+     ports:
+        - "9000:9000"
+  temp:
+     build: ./mars-challenge/sensorsuite/temperature
+     ports:
+        - "9001:9001"
+     links:
+        - flare
+     environment:
+        - SENSOR_FLARE_ADDRESS=flare:9000
+  rad:
+     build: ./mars-challenge/sensorsuite/radiation
+     ports: 
+        - "9002:9002"
+     links:
+        - flare
+     environment:
+        - SENSOR_FLARE_ADDRESS=flare:9000
+
+  GameController:
+     image: 'emccode/mars-challenge-controller'
+     ports:
+        - "8000:8080"
+     environment:
+        - AUTO_READINGS=false
+        - ADMIN_TOKEN=1234
+  Aggregator:
+     image: 'emccode/mars-challenge-aggregator'
+     ports: 
+        - "9004:9004"
+     links:
+        - flare
+     environment:
+        - SENSOR_FLARE_ADDRESS=flare:9000
+        - GC_ADDRESS=GameController:8080
+  pub:
+     build: ./mars-challenge/sensorsuite/publisher
+     ports:
+        - "9003:9003"
+     links:
+        - Aggregator
+        - temp
+        - rad
+     environment:
+        - SENSOR_TEMPERATURE_ADDRESS=temp:9001
+        - SENSOR_RADIATION_ADDRESS=rad:9002
+        - SENSOR_AGGREGATOR_ADDRESS=Aggregator:9004
+  Dashboard:
+     image: 'emccode/mars-challenge-dashboard'
+     ports:
+        - "8001:80"
+     environment:
+        - WS_ENDPOINT=192.168.1.106:8000/ws 
+
